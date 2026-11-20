@@ -1,0 +1,12 @@
+diff --git a/shared/types/integrations.ts b/shared/types/integrations.ts
+index 119e2a1..3f2a0b8 100644
+--- a/shared/types/integrations.ts
++++ b/shared/types/integrations.ts
+@@ -26,6 +26,7 @@ export enum IntegrationService {
+   GitLab = "gitlab",
+   Gitea = "gitea",
+   Linear = "linear",
++  AzureDevOps = "azure-devops",
+   Figma = "figma",
+   Notion = "notion",
+   Markdown = "markdown",

@@ -1,0 +1,61 @@
+# Baut Outline mit dem Azure-DevOps-Plugin und pusht das Image in die Azure Container Registry.
+#
+# Benötigte Repository-Variablen (Settings > Secrets and variables > Actions > Variables):
+#   AZURE_CLIENT_ID        Client ID der App-Registrierung mit AcrPush auf der Registry
+#   AZURE_TENANT_ID        Tenant ID dieser App-Registrierung
+#   AZURE_SUBSCRIPTION_ID  Subscription, in der die Registry liegt
+#   ACR_NAME               Name der Azure Container Registry
+#
+# Anmeldung per OIDC: An der App braucht es ein Federated Credential mit
+#   Issuer:  https://token.actions.githubusercontent.com
+#   Subject: repo:<owner>/<repo>:ref:refs/heads/main
+
+name: Build image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "plugin/**"
+      - "patches/**"
+      - "OUTLINE_VERSION"
+      - ".github/workflows/build-image.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Outline-Quellbaum vorbereiten
+        run: ./scripts/prepare-build.sh build/outline
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Images bauen und pushen
+        working-directory: build/outline
+        run: |
+          set -euo pipefail
+          az acr login --name "${{ vars.ACR_NAME }}"
+          SERVER="$(az acr show -n "${{ vars.ACR_NAME }}" --query loginServer -o tsv)"
+          TAG="ado-$(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
+
+          docker build -f Dockerfile.base -t "$SERVER/outline-base:$TAG" .
+          docker build -f Dockerfile --build-arg BASE_IMAGE="$SERVER/outline-base:$TAG" -t "$SERVER/outline:$TAG" .
+
+          docker push "$SERVER/outline-base:$TAG"
+          docker push "$SERVER/outline:$TAG"
+
+          echo "### Neues Image" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$SERVER/outline:$TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "In der Deploy-Pipeline als OUTLINE_IMAGE setzen." >> "$GITHUB_STEP_SUMMARY"
