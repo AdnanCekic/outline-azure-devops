@@ -38,8 +38,13 @@ else
 fi
 
 echo ">> Installiere Abhängigkeiten"
-corepack enable
-yarn install
+# Node 25+ liefert corepack nicht mehr mit, dann wird es über npx geholt.
+if command -v corepack >/dev/null 2>&1; then
+  corepack enable
+  yarn install
+else
+  npx --yes corepack yarn install
+fi
 
 echo
 echo "Fertig. Prüfen im Ordner outline:"
